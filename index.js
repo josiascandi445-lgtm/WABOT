@@ -12,6 +12,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { startWhatsApp } = require("./lib/whatsapp");
+const { onMessage } = require("./handlers/onMessage");
 
 // ─── Tratamento Global de Erros ─────────────────────────────────
 process.on("unhandledRejection", (reason) => {
@@ -84,66 +85,14 @@ console.log(`\n📌 Total de comandos: ${commands.size}`);
 console.log(`📌 Prefixo: "${PREFIX}"`);
 console.log(`📌 Owner: ${OWNER_NUMBER || "(não definido)"}\n`);
 
-// ─── Handler de Mensagens ───────────────────────────────────────
-async function onMessage(sock, msg) {
-  try {
-    const body =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      msg.message?.videoMessage?.caption ||
-      "";
-
-    if (!body.startsWith(PREFIX)) return;
-
-    const [rawCommand, ...args] = body
-      .slice(PREFIX.length)
-      .trim()
-      .split(/\s+/);
-
-    if (!rawCommand) return;
-
-    const commandName = rawCommand.toLowerCase();
-
-    if (!commands.has(commandName)) return;
-
-    const command = commands.get(commandName);
-
-    const sender = msg.key.participant || msg.key.remoteJid || "";
-    const senderNumber = sender.split("@")[0];
-
-    const context = {
-      prefix: PREFIX,
-      ownerNumber: OWNER_NUMBER,
-      ownerJid: OWNER_NUMBER
-        ? `${OWNER_NUMBER}@s.whatsapp.net`
-        : null,
-      isOwner:
-        OWNER_NUMBER &&
-        senderNumber === OWNER_NUMBER,
-    };
-
-    console.log(
-      `📨 Comando: ${PREFIX}${commandName} | De: ${sender}`
-    );
-
-    await command.execute(
-      sock,
-      msg,
-      args,
-      context
-    );
-  } catch (err) {
-    console.error("❌ Erro no handler de mensagem:", err);
-  }
-}
-
 // ─── Inicialização do WhatsApp ─────────────────────────────────
 async function bootWhatsApp() {
   try {
     console.log("🚀 Iniciando WhatsApp Bot...\n");
 
+    // ✅ FIX: agora usa o handler correto importado
     await startWhatsApp(onMessage);
+
   } catch (err) {
     console.error("❌ Falha ao iniciar WhatsApp:", err);
 
