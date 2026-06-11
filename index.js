@@ -1,105 +1,70 @@
 /**
- * index.js
- * Ponto de entrada do WhatsApp Bot.
- * - Inicia servidor Express (Render)
- * - Conecta ao WhatsApp via Baileys
- * - Carrega comandos
+ * index.js — Entry point do WhatsApp Bot
+ *
+ * Responsabilidades:
+ *  1. Iniciar servidor Express (para Render / keep-alive)
+ *  2. Iniciar conexão WhatsApp via Baileys
+ *  3. Gerir erros não capturados
  */
 
-require("dotenv").config();
+import "dotenv/config"; // carrega .env se existir (dev local)
+import express from "express";
+import { connectToWhatsApp } from "./lib/whatsapp.js";
 
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const { startWhatsApp } = require("./lib/whatsapp");
-const { onMessage } = require("./handlers/onMessage");
+const PORT = process.env.PORT ?? 3000;
 
-// ─── Tratamento Global de Erros ─────────────────────────────────
-process.on("unhandledRejection", (reason) => {
-  console.error("❌ Unhandled Rejection:", reason);
-});
-
-process.on("uncaughtException", (error) => {
-  console.error("❌ Uncaught Exception:", error);
-});
-
-// ─── Configurações ──────────────────────────────────────────────
-const PORT = process.env.PORT;
-
-if (!PORT) {
-  console.error("❌ PORT não definida pelo Render");
-  process.exit(1);
-}
-
-const PREFIX = process.env.PREFIX || ".";
-const OWNER_NUMBER = process.env.OWNER_NUMBER || "";
-
-// ─── Servidor Express ───────────────────────────────────────────
+// ─── SERVIDOR EXPRESS ──────────────────────────────────────────────────────────
+// Mantém o processo vivo no Render e serve como health check endpoint
 const app = express();
 
-app.get("/", (req, res) => {
-  res.send("🤖 Bot Online");
-});
-
-app.get("/status", (req, res) => {
+app.get("/", (_req, res) => {
   res.json({
     status: "online",
-    uptime: Math.floor(process.uptime()),
+    bot: process.env.BOT_NAME ?? "WhatsApp Bot",
+    uptime: `${Math.floor(process.uptime())}s`,
     timestamp: new Date().toISOString(),
-    commands: commands.size,
   });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🌐 Servidor HTTP rodando na porta ${PORT}`);
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
 });
 
-// ─── Carregamento de Comandos ───────────────────────────────────
-const commands = new Map();
-const commandsDir = path.join(__dirname, "commands");
+app.listen(PORT, () => {
+  console.log(`[Server] ✅ Express a correr na porta ${PORT}`);
+});
 
-if (!fs.existsSync(commandsDir)) {
-  console.error("❌ Pasta /commands não encontrada");
-  process.exit(1);
-}
+// ─── BOOTSTRAP DO BOT ─────────────────────────────────────────────────────────
+async function start() {
+  console.log("═══════════════════════════════════════");
+  console.log(`  🤖 ${process.env.BOT_NAME ?? "WhatsApp Bot"} — A Iniciar`);
+  console.log("═══════════════════════════════════════");
 
-fs.readdirSync(commandsDir)
-  .filter((file) => file.endsWith(".js"))
-  .forEach((file) => {
-    try {
-      const command = require(path.join(commandsDir, file));
-
-      if (!command?.name || typeof command.execute !== "function") {
-        console.warn(`⚠️ Comando inválido ignorado: ${file}`);
-        return;
-      }
-
-      commands.set(command.name.toLowerCase(), command);
-      console.log(`✅ Comando carregado: ${PREFIX}${command.name}`);
-    } catch (err) {
-      console.error(`❌ Erro ao carregar ${file}:`, err);
-    }
-  });
-
-console.log(`\n📌 Total de comandos: ${commands.size}`);
-console.log(`📌 Prefixo: "${PREFIX}"`);
-console.log(`📌 Owner: ${OWNER_NUMBER || "(não definido)"}\n`);
-
-// ─── Inicialização do WhatsApp ─────────────────────────────────
-async function bootWhatsApp() {
   try {
-    console.log("🚀 Iniciando WhatsApp Bot...\n");
-
-    // ✅ FIX: agora usa o handler correto importado
-    await startWhatsApp(onMessage);
-
+    await connectToWhatsApp();
   } catch (err) {
-    console.error("❌ Falha ao iniciar WhatsApp:", err);
-
-    console.log("🔄 Nova tentativa em 5 segundos...");
-
-    setTimeout(bootWhatsApp, 5000);
+    console.error("[Bootstrap] Erro fatal ao iniciar o bot:", err.message);
+    console.error(err.stack);
+    process.exit(1);
   }
 }
 
-bootWhatsApp();
+// ─── ERROS NÃO CAPTURADOS ─────────────────────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("[Process] Exceção não capturada:", err.message);
+  console.error(err.stack);
+  // Não termina o processo para evitar restart desnecessário
+  // Se for crítico, o Render reinicia automaticamente
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[Process] Promise rejeitada sem handler:", reason);
+});
+
+process.on("SIGTERM", () => {
+  console.log("[Process] SIGTERM recebido. A terminar graciosamente...");
+  process.exit(0);
+});
+
+// ─── ARRANQUE ─────────────────────────────────────────────────────────────────
+start();

@@ -1,158 +1,116 @@
-# 🤖 WhatsApp Bot — Baileys + Express + Render
+# 🤖 WhatsApp Bot — Baileys + Node.js
 
-Bot de WhatsApp construído com Node.js, Baileys e Express, pronto para deploy no Render.
+Bot de WhatsApp production-ready usando `@whiskeysockets/baileys`, com sistema de comandos modular, sessão persistente e deploy no Render.
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura de Pastas
 
 ```
-/
-├── index.js              # Ponto de entrada
-├── package.json
-├── .env.example
-├── .gitignore
+whatsapp-bot/
+├── index.js                 # Entry point — Express + bootstrap
 ├── lib/
-│   └── whatsapp.js       # Lógica de conexão Baileys
+│   └── whatsapp.js          # Conexão Baileys (pairing, eventos, reconexão)
+├── handlers/
+│   └── onMessage.js         # Handler central de mensagens
 ├── commands/
-│   ├── ping.js
-│   ├── menu.js
-│   ├── ban.js
-│   ├── add.js
-│   └── music.js
-└── session/              # Gerado automaticamente (não commitar)
+│   ├── ping.js              # .ping
+│   ├── help.js              # .help
+│   ├── info.js              # .info
+│   └── echo.js              # .echo <texto>
+├── session/                 # Credenciais persistentes (não commitar!)
+├── .env.example
+├── render.yaml
+└── package.json
 ```
 
 ---
 
-## ⚙️ Variáveis de Ambiente
-
-Copie `.env.example` para `.env` e preencha:
-
-```env
-OWNER_NUMBER=244912345678   # Seu número (sem + ou espaços)
-PAIRING_NUMBER=244912345678 # Número para autenticar o bot
-PREFIX=.                    # Prefixo dos comandos
-PORT=3000                   # Porta (Render define automaticamente)
-```
-
----
-
-## 🚀 Instalação Local
+## ⚡ Setup Local
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/whatsapp-bot.git
-cd whatsapp-bot
-
-# 2. Instale as dependências
+# 1. Instalar dependências
 npm install
 
-# 3. Configure o .env
+# 2. Configurar variáveis de ambiente
 cp .env.example .env
-# Edite o .env com seus dados
+# Editar .env com o teu número
 
-# 4. Inicie o bot
+# 3. Iniciar
 npm start
 ```
 
 ---
 
-## 📱 Como Conectar via Pairing Code
+## 🌐 Deploy no Render
 
-1. Defina `PAIRING_NUMBER` no `.env` com o número do WhatsApp a vincular
-2. Execute `npm start`
-3. O terminal exibirá um código de 8 dígitos, ex: `ABCD-EFGH`
-4. No WhatsApp do celular:
-   - Vá em **Configurações → Dispositivos vinculados**
-   - Toque em **Vincular um dispositivo**
-   - Toque em **Vincular com número de telefone**
-   - Digite o código exibido no terminal
-5. Pronto! O bot estará conectado ✅
+1. Criar novo **Web Service** no Render
+2. Ligar ao teu repositório GitHub
+3. Configurar variáveis de ambiente:
+   - `PAIRING_NUMBER` → o teu número (ex: `351912345678`)
+   - `PREFIX` → `.` (ou outro prefixo)
+   - `BOT_NAME` → nome do bot
+4. **IMPORTANTE:** Adicionar um **Disk** no Render:
+   - Nome: `session-storage`
+   - Mount path: `/opt/render/project/src/session`
+   - Tamanho: 1 GB
+   - ⚠️ Sem o disk, a sessão perde-se em cada deploy!
+5. Deploy → ver logs → introduzir pairing code no WhatsApp
 
 ---
 
-## ☁️ Deploy no Render
+## 🔑 Primeiro Login (Pairing Code)
 
-### Pré-requisitos
-- Conta no [Render](https://render.com)
-- Repositório Git (GitHub, GitLab, etc.)
+1. O bot mostra no log:
+   ```
+   ╔══════════════════════════════════╗
+   ║  PAIRING CODE: ABCD-1234         ║
+   ║  Vai a WhatsApp > Dispositivos   ║
+   ║  Ligados > Ligar dispositivo     ║
+   ╚══════════════════════════════════╝
+   ```
+2. No telemóvel: **WhatsApp → ⋮ → Dispositivos Ligados → Ligar um dispositivo**
+3. Escolhe **Ligar com número de telefone** e introduz o código
+4. A sessão fica guardada em `/session` — não volta a pedir código
 
-### Passo a passo
+---
 
-**1. Suba o código para o GitHub**
-```bash
-git init
-git add .
-git commit -m "feat: WhatsApp bot inicial"
-git remote add origin https://github.com/seu-usuario/whatsapp-bot.git
-git push -u origin main
+## ➕ Adicionar Comandos
+
+Cria um ficheiro em `commands/novocomando.js`:
+
+```js
+export default {
+  name: "ola",
+  aliases: ["hi"],          // opcional
+  description: "Diz olá.", // para o .help
+
+  async execute({ sock, msg, jid, sender, args, isGroup, prefix, botName }) {
+    await sock.sendMessage(jid, { text: `Olá, ${sender}! 👋` }, { quoted: msg });
+  },
+};
 ```
 
-**2. Crie um novo Web Service no Render**
-- Acesse [render.com](https://render.com) → Dashboard → **New +** → **Web Service**
-- Conecte seu repositório GitHub
-- Configure:
-  - **Name:** `whatsapp-bot`
-  - **Region:** Frankfurt (EU) ou Oregon (US)
-  - **Branch:** `main`
-  - **Runtime:** `Node`
-  - **Build Command:** `npm install`
-  - **Start Command:** `node index.js`
-  - **Instance Type:** Free (ou pago para persistência)
-
-**3. Configure as variáveis de ambiente no Render**
-
-Em **Environment → Add Environment Variable**, adicione:
-| Chave | Valor |
-|-------|-------|
-| `OWNER_NUMBER` | seu número |
-| `PAIRING_NUMBER` | número para vincular |
-| `PREFIX` | `.` |
-
-**4. Deploy**
-- Clique em **Create Web Service**
-- Aguarde o build finalizar
-- Veja os logs para obter o Pairing Code
-- Conecte o WhatsApp como descrito acima
-
-### ⚠️ Importante sobre o Render Free
-
-O plano gratuito do Render **hiberna o serviço após 15 minutos sem requisições**.
-Para manter ativo, use um serviço de ping como [UptimeRobot](https://uptimerobot.com):
-- URL: `https://seu-app.onrender.com/`
-- Intervalo: 5 minutos
+O comando fica disponível automaticamente como `.ola` sem reiniciar.
 
 ---
 
-## 📋 Comandos Disponíveis
+## 🔄 Lógica de Reconexão
 
-| Comando | Descrição | Restrição |
-|---------|-----------|-----------|
-| `.ping` | Testa o bot e mostra latência | — |
-| `.menu` | Mostra todos os comandos | — |
-| `.ban @user` | Remove participante do grupo | Admin |
-| `.add número` | Adiciona participante ao grupo | Admin |
-| `.music nome` | Pesquisa música no YouTube | — |
-
----
-
-## 🛠️ Dependências
-
-```json
-{
-  "@whiskeysockets/baileys": "^6.7.9",
-  "axios": "^1.7.2",
-  "dotenv": "^16.4.5",
-  "express": "^4.19.2",
-  "pino": "^9.3.1",
-  "pino-pretty": "^11.2.1",
-  "qrcode-terminal": "^0.12.0"
-}
-```
+| Situação | Comportamento |
+|---|---|
+| Queda de rede temporária | Reconecta automaticamente (até 5x, delay crescente) |
+| `restartRequired` | Reconecta imediatamente, sem contar como falha |
+| `loggedOut` | Limpa sessão e termina (Render reinicia → novo pairing) |
+| 5 falhas consecutivas | Termina o processo (Render reinicia) |
 
 ---
 
-## 📝 Licença
+## 📋 Variáveis de Ambiente
 
-MIT — use livremente.
+| Variável | Obrigatório | Descrição |
+|---|---|---|
+| `PAIRING_NUMBER` | ✅ | Número com código de país, sem `+` |
+| `PORT` | Auto (Render) | Porta Express |
+| `PREFIX` | ❌ (default: `.`) | Prefixo dos comandos |
+| `BOT_NAME` | ❌ (default: `Bot`) | Nome do bot |

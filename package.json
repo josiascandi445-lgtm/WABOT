@@ -1,21 +1,25 @@
 {
   "name": "whatsapp-bot",
   "version": "1.0.0",
-  "description": "WhatsApp Bot com Baileys + Express para Render",
+  "description": "WhatsApp Bot usando Baileys - Production Ready",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
-  "engines": {
-    "node": "18.x"
-  },
   "dependencies": {
-    "@whiskeysockets/baileys": "6.7.9",
-    "axios": "^1.7.2",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.18.2",
+    "pino": "^8.19.0",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "pino": "^9.3.1",
-    "qrcode-terminal": "^0.12.0"
+    "@distube/ytdl-core": "^4.16.10",
+    "yt-search": "^2.12.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "ffmpeg-static": "^5.2.0",
+    "sharp": "^0.33.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
